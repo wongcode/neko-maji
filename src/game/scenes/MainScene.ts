@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameConfig } from '../Game';
+import { ToyRenderer } from '../objects/ToyRenderer';
 
 import { TOYS, BOARD_WIDTH, BOARD_HEIGHT, DANGER_LINE_Y, SPAWN_Y } from '../constants';
 
@@ -20,10 +21,6 @@ export class MainScene extends Phaser.Scene {
     // Visuals
     private aimLine!: Phaser.GameObjects.Graphics;
     private ghostToy!: Phaser.GameObjects.Container;
-    private ghostCircle!: Phaser.GameObjects.Arc;
-    private ghostShine!: Phaser.GameObjects.Arc;
-    private ghostBorder!: Phaser.GameObjects.Arc;
-    private ghostEmoji!: Phaser.GameObjects.Text;
     private dangerLine!: Phaser.GameObjects.Graphics;
     private wallGraphics!: Phaser.GameObjects.Graphics;
 
@@ -161,14 +158,11 @@ export class MainScene extends Phaser.Scene {
         this.aimLine = this.add.graphics();
 
         // Ghost Toy
-        this.ghostToy = this.add.container(0, 0);
-        this.ghostCircle = this.add.circle(0, 0, 10, 0xffffff);
-        this.ghostShine = this.add.circle(0, 0, 10, 0xffffff, 0.3);
-        this.ghostBorder = this.add.circle(0, 0, 10);
-        this.ghostBorder.setStrokeStyle(2, 0x000000, 0.1);
-
-        this.ghostEmoji = this.add.text(0, 0, '', { fontSize: '20px', fontFamily: 'serif' }).setOrigin(0.5);
-        this.ghostToy.add([this.ghostCircle, this.ghostShine, this.ghostBorder, this.ghostEmoji]);
+        // Initialize with default toy (index 0)
+        const defaultToy = TOYS[0];
+        this.ghostToy = ToyRenderer.createToyVisuals(this, defaultToy);
+        this.ghostToy.setAlpha(0.5);
+        this.ghostToy.setVisible(false);
         this.ghostToy.setAlpha(0.6); // Make ghost semi-transparent
     }
 
@@ -180,11 +174,17 @@ export class MainScene extends Phaser.Scene {
         }
 
         const currentToy = TOYS[this.currentToyIdx];
+        const scaleX = currentToy.scaleX || 1;
+        const scaleY = currentToy.scaleY || 1;
+        const width = currentToy.radius * 2 * scaleX;
+        const height = currentToy.radius * 2 * scaleY;
 
         // Constrain X relative to board
+        // Use half-width for constraint
+        const halfWidth = width / 2;
         let relativeX = this.mouseX - this.boardX;
-        if (relativeX < currentToy.radius + 5) relativeX = currentToy.radius + 5;
-        if (relativeX > BOARD_WIDTH - currentToy.radius - 5) relativeX = BOARD_WIDTH - currentToy.radius - 5;
+        if (relativeX < halfWidth + 5) relativeX = halfWidth + 5;
+        if (relativeX > BOARD_WIDTH - halfWidth - 5) relativeX = BOARD_WIDTH - halfWidth - 5;
 
         const absX = this.boardX + relativeX;
         const absY = this.boardY + SPAWN_Y;
@@ -198,25 +198,14 @@ export class MainScene extends Phaser.Scene {
         this.aimLine.strokePath();
 
         // Update Ghost
-        this.ghostToy.setVisible(true);
+        if (this.ghostToy) {
+            this.ghostToy.destroy();
+        }
+
+        this.ghostToy = ToyRenderer.createToyVisuals(this, currentToy);
+        this.ghostToy.setAlpha(0.5);
         this.ghostToy.setPosition(absX, absY);
-
-        this.ghostCircle.setRadius(currentToy.radius);
-        this.ghostCircle.setFillStyle(currentToy.color);
-
-        // Update Shine
-        this.ghostShine.setPosition(-currentToy.radius * 0.3, -currentToy.radius * 0.3);
-        this.ghostShine.setRadius(currentToy.radius * 0.2);
-
-        // Update Border
-        this.ghostBorder.setRadius(currentToy.radius);
-        // We keep the stroke style set in createVisuals or update it here if needed
-
-        // Update Emoji
-        this.ghostEmoji.setText(currentToy.emoji);
-        const fontSize = currentToy.radius * 1.0;
-        this.ghostEmoji.setFontSize(`${fontSize}px`);
-        this.ghostEmoji.setY(0);
+        this.ghostToy.setVisible(true);
     }
 
     private getRandomToyIndex() {
@@ -231,39 +220,96 @@ export class MainScene extends Phaser.Scene {
 
     private spawnToy(x: number, y: number, index: number) {
         const toyConfig = TOYS[index];
+        let body: Matter.Body;
 
-        const body = this.matter.add.circle(x, y, toyConfig.radius, {
-            restitution: 0.2,
-            friction: 0.1,
-            density: 0.002,
-            label: index.toString()
+        if (toyConfig.bodies) {
+            const parts: Matter.Body[] = [];
+
+            toyConfig.bodies.forEach(partDef => {
+                let part: Matter.Body;
+                if (partDef.type === 'circle') {
+                    part = this.matter.bodies.circle(x + partDef.x, y + partDef.y, partDef.radius!) as Matter.Body;
+                } else if (partDef.type === 'polygon' && partDef.vertices) {
+                    part = this.matter.bodies.fromVertices(x + partDef.x, y + partDef.y, [partDef.vertices]) as Matter.Body;
+                } else {
+                    part = this.matter.bodies.circle(x + partDef.x, y + partDef.y, 10) as Matter.Body;
+                }
+
+                if (partDef.scaleX || partDef.scaleY) {
+                    this.matter.body.scale(part as any, partDef.scaleX || 1, partDef.scaleY || 1);
+                }
+
+                parts.push(part);
+            });
+
+            body = this.matter.body.create({
+                parts: parts as any[],
+                restitution: 0.2,
+                friction: 0.1,
+                density: 0.002,
+                label: index.toString()
+            }) as Matter.Body;
+
+        } else {
+            body = this.matter.add.circle(x, y, toyConfig.radius, {
+                restitution: 0.2,
+                friction: 0.1,
+                density: 0.002,
+                label: index.toString()
+            }) as Matter.Body;
+
+            if (toyConfig.shape === 'oval' && toyConfig.scaleX && toyConfig.scaleY) {
+                this.matter.body.scale(body as any, toyConfig.scaleX, toyConfig.scaleY);
+            }
+        }
+
+        // Create Visuals using Renderer
+        const container = ToyRenderer.createToyVisuals(this, toyConfig);
+
+        // Adjust container position to match body center of mass
+        // When we attach gameObject to body, Phaser sets gameObject position to body.position.
+        // If body.position (COM) is different from the "visual center" (x,y),
+        // we need to offset the visuals inside the container.
+
+        // Calculate offset between original (x,y) and new body.position
+        // Actually, we just place the container at the body position.
+        // But the visuals inside the container are centered at (0,0).
+        // If the body COM is shifted, (0,0) of the container (which aligns with COM)
+        // will not align with the "intended" visual center.
+
+        // Example: Fish. Main body at (0,0). Tail at (-60,0). COM at (-10,0).
+        // Body position = (x-10, y).
+        // Container position = (x-10, y).
+        // Visuals at (0,0) in container -> World (x-10, y).
+        // But we want Main Body Visual at World (x, y).
+        // So we need to shift visuals by (+10, 0).
+        // Offset = (x, y) - body.position.
+
+        // Note: We haven't added the body to the world yet if we used Matter.Body.create
+        // so body.position might be just the calculated COM.
+        // If we created parts at (x... , y...), the body position is already absolute.
+
+        const offset = {
+            x: x - body.position.x,
+            y: y - body.position.y
+        };
+
+        // Apply offset to all children in container
+        container.each((child: Phaser.GameObjects.GameObject) => {
+            if ('x' in child && 'y' in child) {
+                (child as any).x += offset.x;
+                (child as any).y += offset.y;
+            }
         });
 
-        // We need to attach the visual game object to the body
-        // In Phaser Matter, we usually create the GameObject first and then setExistingBody, 
-        // or use the factory methods that do both.
-
-        // Let's use a Container for the visual (Circle + Emoji)
-        const container = this.add.container(x, y);
-        const circle = this.add.circle(0, 0, toyConfig.radius, toyConfig.color);
-
-        // Inner Shine
-        const shine = this.add.circle(-toyConfig.radius * 0.3, -toyConfig.radius * 0.3, toyConfig.radius * 0.2, 0xffffff, 0.3);
-
-        // Border
-        const border = this.add.circle(0, 0, toyConfig.radius);
-        border.setStrokeStyle(2, 0x000000, 0.1);
-
-        const fontSize = toyConfig.radius * 1.0;
-        const emoji = this.add.text(0, 0, toyConfig.emoji, {
-            fontSize: `${fontSize}px`,
-            fontFamily: 'sans-serif',
-            padding: { x: 0, y: 0 }
-        }).setOrigin(0.5);
-
-        container.add([circle, shine, border, emoji]);
+        container.setPosition(body.position.x, body.position.y);
 
         // Attach physics
+        // If we created body manually, we need to add it to world
+        if (toyConfig.bodies) {
+            this.matter.world.add(body);
+        }
+
         this.matter.add.gameObject(container, body);
 
         // Store data on the body for collision logic
@@ -277,7 +323,11 @@ export class MainScene extends Phaser.Scene {
 
         this.dropCooldown = true;
 
-        const radius = TOYS[this.currentToyIdx].radius;
+        this.dropCooldown = true;
+
+        const currentToy = TOYS[this.currentToyIdx];
+        const scaleX = currentToy.scaleX || 1;
+        const radius = currentToy.radius * scaleX; // Use effective width radius for clamping
 
         // Calculate relative X first
         let relativeX = this.mouseX - this.boardX;
@@ -304,17 +354,21 @@ export class MainScene extends Phaser.Scene {
             const bodyB = pairs[i].bodyB as Matter.Body;
 
             // Check labels (we stored index as string in label)
-            if (bodyA.label === bodyB.label && !bodyA.isStatic && !bodyB.isStatic) {
-                const tier = parseInt(bodyA.label);
+            // For compound bodies, we must check the parent's label
+            const parentA = bodyA.parent;
+            const parentB = bodyB.parent;
+
+            if (parentA.label === parentB.label && !parentA.isStatic && !parentB.isStatic) {
+                const tier = parseInt(parentA.label);
 
                 if (tier < TOYS.length - 1) {
                     // Check if already processed
-                    if (!(bodyA as any).toRemove && !(bodyB as any).toRemove) {
-                        (bodyA as any).toRemove = true;
-                        (bodyB as any).toRemove = true;
+                    if (!(parentA as any).toRemove && !(parentB as any).toRemove) {
+                        (parentA as any).toRemove = true;
+                        (parentB as any).toRemove = true;
 
-                        const midX = (bodyA.position.x + bodyB.position.x) / 2;
-                        const midY = (bodyA.position.y + bodyB.position.y) / 2;
+                        const midX = (parentA.position.x + parentB.position.x) / 2;
+                        const midY = (parentA.position.y + parentB.position.y) / 2;
 
                         this.score += TOYS[tier].score;
                         this.config.onScoreChange(this.score);
@@ -322,12 +376,13 @@ export class MainScene extends Phaser.Scene {
 
                         // Remove bodies and their game objects
                         // In Phaser Matter, removing the GameObject usually removes the body too if linked
-                        if ((bodyA as any).gameObject) (bodyA as any).gameObject.destroy();
-                        if ((bodyB as any).gameObject) (bodyB as any).gameObject.destroy();
+                        // But for compound bodies, the gameObject is linked to the parent body.
+                        if ((parentA as any).gameObject) (parentA as any).gameObject.destroy();
+                        if ((parentB as any).gameObject) (parentB as any).gameObject.destroy();
 
                         // Just to be safe, remove from world if not destroyed
-                        this.matter.world.remove(bodyA);
-                        this.matter.world.remove(bodyB);
+                        this.matter.world.remove(parentA);
+                        this.matter.world.remove(parentB);
 
                         this.spawnToy(midX, midY, tier + 1);
                     }
