@@ -1,0 +1,24 @@
+{
+  "name": "neko-maji",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "matter-js": "^0.19.0",
+    "phaser": "^3.60.0",
+    "preact": "^10.13.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.5.0",
+    "@types/matter-js": "^0.18.2",
+    "@types/node": "^18.15.0",
+    "typescript": "^5.0.2",
+    "vite": "^4.3.0",
+    "vitest": "^4.0.14"
+  }
+}
