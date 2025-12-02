@@ -203,6 +203,10 @@ export class MainScene extends Phaser.Scene {
     private updateLayout() {
         const { width, height } = this.scale;
 
+        // Store old position to calculate delta
+        const oldBoardX = this.boardX;
+        const oldBoardY = this.boardY;
+
         // Calculate zoom to fit board with some padding
         // We want the board (450px wide) to fit within the screen width
         // If screen is narrower than board + padding, zoom out.
@@ -228,6 +232,28 @@ export class MainScene extends Phaser.Scene {
         // For Y, we might want to stick to the bottom or center?
         // Let's center vertically for now, or stick to bottom if tall enough.
         this.boardY = (height - BOARD_HEIGHT) / 2;
+
+        // Calculate Delta
+        const diffX = this.boardX - oldBoardX;
+        const diffY = this.boardY - oldBoardY;
+
+        // Shift existing toys if board moved (and it's not the first run)
+        if (this.toysGroup && (diffX !== 0 || diffY !== 0)) {
+            // We only shift if oldBoardX was not 0 (or if we are sure it's a resize)
+            // Actually, even if it was 0, if toys exist, they were placed relative to 0.
+            // So shifting them is correct.
+
+            this.toysGroup.getChildren().forEach((child: any) => {
+                if (child.body) {
+                    // Move the physics body
+                    this.matter.body.translate(child.body, { x: diffX, y: diffY });
+                    // The GameObject position will be updated automatically by Phaser-Matter sync
+                }
+            });
+
+            // Also shift mouseX so the ghost doesn't jump
+            this.mouseX += diffX;
+        }
 
         // If we are zoomed out, the effective visible height is larger.
         // But we want the board to be visible.
