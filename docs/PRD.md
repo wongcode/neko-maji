@@ -56,3 +56,6 @@ Accessible via `ESC` key or UI Button.
 ## 6. Assets & Theme
 - **Visual Style**: Cute, "Neko" (Cat) themed.
 - **Pieces**: 11 distinct assets representing cat toys and cats.
+
+### 6.1 Tangram Rules
+- **Connectivity**: Any object represented as a Tangram (e.g., Fish, Cat) must have all its individual geometric pieces touching each other. There should be no floating or disconnected parts.

@@ -6,33 +6,29 @@ export class TangramFishVisual implements ToyVisual {
     create(scene: Phaser.Scene, config: ToyConfig): Phaser.GameObjects.Container {
         const container = scene.add.container(0, 0);
 
-        // Common Shine
-        const shine = scene.add.circle(
-            -config.radius * 0.3,
-            -config.radius * 0.3,
-            config.radius * 0.2,
-            0xffffff,
-            0.3
-        );
-
         const graphics = scene.add.graphics();
-        this.drawTangramFish(graphics);
 
-        // Draw Googly Eye on the Red Triangle (Head)
-        // Head is roughly (0, -40), (60, 0), (0, 40). Center approx (20, 0).
-        const eyeX = 20;
-        const eyeY = -5;
-        const eye = scene.add.circle(eyeX, eyeY, 8, 0xffffff); // White
-        const pupil = scene.add.circle(eyeX + 2, eyeY, 3, 0x000000); // Black pupil
+        if (config.version === 'v2') {
+            this.drawTangramFishV2(graphics);
+        } else {
+            this.drawTangramFishV1(graphics);
+        }
 
-        container.add([graphics, shine, eye, pupil]);
+        container.add([graphics]);
 
         return container;
     }
 
-    private drawTangramFish(graphics: Phaser.GameObjects.Graphics, alpha: number = 1) {
-        // Red Triangle (Head) - Pointing Right
-        graphics.fillStyle(0xff0000, alpha); // Red
+    private drawTangramFishV1(graphics: Phaser.GameObjects.Graphics, alpha: number = 1) {
+        // Palette
+        const navy = 0x000080;
+        const darkBlue = 0x00008B;
+        const mediumBlue = 0x4169E1; // Royal Blue
+        const lightBlue = 0x87CEEB; // Sky Blue
+        const cyan = 0x00FFFF;
+
+        // Red Triangle (Head) -> Dark Blue Gradient
+        graphics.fillGradientStyle(mediumBlue, mediumBlue, navy, navy, alpha);
         graphics.fillPoints([
             { x: 0, y: -40 },
             { x: 60, y: 0 },
@@ -45,13 +41,13 @@ export class TangramFishVisual implements ToyVisual {
             { x: 0, y: 40 }
         ], true, true);
 
-        // Green Square (Body) - Left of Head
-        graphics.fillStyle(0x00ff00, alpha); // Green
-        graphics.fillRect(-40, -20, 40, 40); // x, y, width, height
+        // Green Square (Body) -> Blue Gradient
+        graphics.fillGradientStyle(lightBlue, cyan, mediumBlue, mediumBlue, alpha);
+        graphics.fillRect(-40, -20, 40, 40);
         graphics.strokeRect(-40, -20, 40, 40);
 
-        // Yellow Triangle (Top Fin) - Above Green Square
-        graphics.fillStyle(0xffff00, alpha); // Yellow
+        // Yellow Triangle (Top Fin) -> Light Blue Gradient
+        graphics.fillGradientStyle(cyan, lightBlue, mediumBlue, mediumBlue, alpha);
         graphics.fillPoints([
             { x: -40, y: -20 },
             { x: 0, y: -20 },
@@ -63,8 +59,8 @@ export class TangramFishVisual implements ToyVisual {
             { x: -20, y: -40 }
         ], true, true);
 
-        // Orange Triangle (Bottom Fin) - Below Green Square
-        graphics.fillStyle(0xffa500, alpha); // Orange
+        // Orange Triangle (Bottom Fin) -> Light Blue Gradient
+        graphics.fillGradientStyle(cyan, lightBlue, mediumBlue, mediumBlue, alpha);
         graphics.fillPoints([
             { x: -40, y: 20 },
             { x: 0, y: 20 },
@@ -76,8 +72,8 @@ export class TangramFishVisual implements ToyVisual {
             { x: -20, y: 40 }
         ], true, true);
 
-        // Blue Triangle (Tail) - Left of Green Square
-        graphics.fillStyle(0x0000ff, alpha); // Blue
+        // Blue Triangle (Tail) -> Navy Gradient
+        graphics.fillGradientStyle(navy, navy, darkBlue, darkBlue, alpha);
         graphics.fillPoints([
             { x: -40, y: 0 },
             { x: -80, y: -30 },
@@ -87,6 +83,52 @@ export class TangramFishVisual implements ToyVisual {
             { x: -40, y: 0 },
             { x: -80, y: -30 },
             { x: -80, y: 30 }
+        ], true, true);
+    }
+
+    private drawTangramFishV2(graphics: Phaser.GameObjects.Graphics, alpha: number = 1) {
+        // Palette
+        const navy = 0x000080;
+        const darkBlue = 0x00008B;
+        const mediumBlue = 0x4169E1; // Royal Blue
+        const lightBlue = 0x87CEEB; // Sky Blue
+        const cyan = 0x00FFFF;
+
+        // Head (Triangle) - Pointing Right (Further out)
+        // Vertices: (0, -30), (40, 0), (0, 30) relative to x=10
+        // Absolute: (10, -30), (50, 0), (10, 30)
+        graphics.fillGradientStyle(mediumBlue, mediumBlue, navy, navy, alpha);
+        graphics.fillPoints([
+            { x: 10, y: -30 },
+            { x: 50, y: 0 },
+            { x: 10, y: 30 }
+        ], true, true);
+        graphics.strokePoints([
+            { x: 10, y: -30 },
+            { x: 50, y: 0 },
+            { x: 10, y: 30 }
+        ], true, true);
+
+        // Body (Rectangle / 2 Squares)
+        // x: -10, width: 60, height: 50
+        // Vertices: (-50, -25), (10, -25), (10, 25), (-50, 25)
+        graphics.fillGradientStyle(lightBlue, cyan, mediumBlue, mediumBlue, alpha);
+        graphics.fillRect(-50, -25, 60, 50);
+        graphics.strokeRect(-50, -25, 60, 50);
+
+        // Tail (Triangle)
+        // Vertices: (-30, 0), (-70, -35), (-70, 35) relative to x=-20
+        // Absolute: (-50, 0), (-90, -35), (-90, 35)
+        graphics.fillGradientStyle(navy, navy, darkBlue, darkBlue, alpha);
+        graphics.fillPoints([
+            { x: -50, y: 0 },
+            { x: -90, y: -35 },
+            { x: -90, y: 35 }
+        ], true, true);
+        graphics.strokePoints([
+            { x: -50, y: 0 },
+            { x: -90, y: -35 },
+            { x: -90, y: 35 }
         ], true, true);
     }
 }
