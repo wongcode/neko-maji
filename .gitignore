@@ -14,9 +14,6 @@ node_modules/
 # Optional eslint cache
 .eslintcache
 
-# Build output
-dist/
-
 # Environment variables
 .env
 .env.local
