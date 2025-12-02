@@ -24,6 +24,14 @@
 - Higher-level merges award more points.
 - **Objective**: Achieve the highest possible score.
 
+### 2.4 Special Mechanics
+- **Mood Bar ("Purr Meter")**:
+    - A shared "mood meter" increases with each merge.
+    - When full, the player can trigger a one-time ability.
+- **Abilities**:
+    1.  **Purr Burst (Laser)**: A hand with a laser pointer transitions down from the top. The player can aim the laser to burst (destroy) all balls in its path.
+    2.  **Shake**: A small shake of the container to settle pieces for tighter packing.
+
 ## 3. Controls & Input
 - **Platform**: Web (Desktop & Mobile).
 - **Input Methods**:

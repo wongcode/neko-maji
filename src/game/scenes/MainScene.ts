@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameConfig } from '../Game';
 import { ToyRenderer } from '../objects/ToyRenderer';
+import { MoodMeter } from '../objects/MoodMeter';
 
 import { TOYS, BOARD_WIDTH, BOARD_HEIGHT, DANGER_LINE_Y, SPAWN_Y } from '../constants';
 
@@ -17,6 +18,11 @@ export class MainScene extends Phaser.Scene {
     // Layout
     private boardX: number = 0;
     private boardY: number = 0;
+
+    // Mood Meter
+    private mood: number = 0;
+    private readonly MAX_MOOD: number = 100;
+    private moodMeter!: MoodMeter;
 
     // Visuals
     private aimLine!: Phaser.GameObjects.Graphics;
@@ -207,11 +213,24 @@ export class MainScene extends Phaser.Scene {
         const oldBoardX = this.boardX;
         const oldBoardY = this.boardY;
 
-        // Calculate zoom to fit board with some padding
-        // We want the board (450px wide) to fit within the screen width
-        // If screen is narrower than board + padding, zoom out.
+        // Calculate zoom to fit board AND mood meter with some padding
         const padding = 20;
-        const targetWidth = BOARD_WIDTH + padding * 2;
+        const gap = 20;
+        // We need to access static constants or instance properties if we haven't created it yet?
+        // Actually, we create visuals (and mood meter) in createVisuals which is called in create() BEFORE updateLayout is called?
+        // Wait, create() calls updateLayout() at line 59.
+        // createVisuals() is called at line 75.
+        // So on first updateLayout, moodMeter might not exist.
+        // But we need dimensions for layout.
+        // Let's hardcode dimensions here or create it earlier?
+        // Or just use the constants from MoodMeter class if they were static.
+        // They are instance readonly.
+        const METER_WIDTH = 16;
+        const METER_HEIGHT = 400;
+
+        const totalContentWidth = METER_WIDTH + gap + BOARD_WIDTH;
+
+        const targetWidth = totalContentWidth + padding * 2;
         let zoom = 1;
 
         if (width < targetWidth) {
@@ -222,16 +241,22 @@ export class MainScene extends Phaser.Scene {
         this.cameras.main.setZoom(zoom);
         this.cameras.main.centerOn(width / 2, height / 2);
 
-        // Recalculate board position based on zoomed coordinates
-        // The camera is centered, so (0,0) in world space is shifted.
-        // Actually, if we zoom the camera, we just need to center the content.
-        // Let's keep the board centered in the world.
+        // Recalculate positions
+        // We want to center the GROUP (Meter + Gap + Board)
+        const startX = (width - totalContentWidth) / 2;
 
-        // Center board in the world
-        this.boardX = (width - BOARD_WIDTH) / 2;
-        // For Y, we might want to stick to the bottom or center?
-        // Let's center vertically for now, or stick to bottom if tall enough.
+        // Meter Position
+        // const meterX = startX + this.METER_WIDTH / 2; 
+        // We position the container at top-left of its area
+
+        // Board Position
+        this.boardX = startX + METER_WIDTH + gap;
         this.boardY = (height - BOARD_HEIGHT) / 2;
+
+        // Update Meter Position
+        if (this.moodMeter) {
+            this.moodMeter.setPosition(startX, (height - METER_HEIGHT) / 2);
+        }
 
         // Calculate Delta
         const diffX = this.boardX - oldBoardX;
@@ -431,6 +456,20 @@ export class MainScene extends Phaser.Scene {
         this.ghostToy.setAlpha(0.5);
         this.ghostToy.setVisible(false);
         this.ghostToy.setAlpha(0.6); // Make ghost semi-transparent
+        this.createMoodMeter();
+    }
+
+    private createMoodMeter() {
+        if (!this.moodMeter) {
+            this.moodMeter = new MoodMeter(this, 0, 0);
+        }
+        this.updateMoodMeter();
+    }
+
+    private updateMoodMeter() {
+        if (this.moodMeter) {
+            this.moodMeter.updateMood(this.mood, this.MAX_MOOD);
+        }
     }
 
     private updateGhost() {
@@ -659,6 +698,13 @@ export class MainScene extends Phaser.Scene {
                         this.score += TOYS[tier].score;
                         this.config.onScoreChange(this.score);
                         this.playSound('merge');
+
+                        // Increment Mood
+                        // "each merge adds to the meter equivalent to the points added to the score"
+                        // Points = TOYS[tier].score
+                        this.mood += TOYS[tier].score;
+                        if (this.mood > this.MAX_MOOD) this.mood = this.MAX_MOOD;
+                        this.updateMoodMeter();
 
                         // Remove bodies and their game objects
                         // In Phaser Matter, removing the GameObject usually removes the body too if linked
