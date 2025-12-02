@@ -9,6 +9,8 @@ export function App() {
 
     const gameInstanceRef = useRef<Phaser.Game | null>(null);
 
+    const [isPaused, setIsPaused] = useState(false);
+
     useEffect(() => {
         if (gameContainerRef.current && !gameInstanceRef.current) {
             const game = launchGame(gameContainerRef.current, {
@@ -17,6 +19,10 @@ export function App() {
                 onGameOver: () => setGameOver(true),
             });
             gameInstanceRef.current = game;
+
+            // Listen for pause/resume events
+            game.events.on('pause', () => setIsPaused(true));
+            game.events.on('resume', () => setIsPaused(false));
         }
 
         return () => {
@@ -34,19 +40,27 @@ export function App() {
                 scene.events.emit('restart');
                 setGameOver(false);
                 setScore(0);
+                setIsPaused(false);
             }
         }
     };
+
+    // Dynamic styles for paused state
+    const boxStyle = isPaused ? {
+        background: '#fcf0e1', // Opaque background matching body
+        opacity: 1,
+        backdropFilter: 'none'
+    } : {};
 
     return (
         <div id="game-wrapper" style={{ width: '100%', height: '100%' }}>
             {/* UI Layer */}
             <div id="ui-layer">
-                <div className="score-box">
+                <div className="score-box" style={boxStyle}>
                     <span className="score-label">SCORE</span>
                     <span id="score">{score}</span>
                 </div>
-                <div className="next-box">
+                <div className="next-box" style={boxStyle}>
                     <span className="next-label">NEXT</span>
                     <div id="next-item-display">
                         {nextItem}

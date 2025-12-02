@@ -40,13 +40,15 @@
 - Pause/Menu Button.
 
 ### 4.2 Pause Menu
-Accessible via `ESC` key or UI Button.
-**Options:**
-1.  **Resume**: Return to the game.
-2.  **Helper Infographic**: A visual guide showing the progression of pieces (Level 1 -> Level 2 -> ... -> Level 11).
-3.  **High Scores**:
-    - Displays **Top 5 Local High Scores**.
-    - Shows Score and Date/Time achieved.
+- **Trigger**: Click on the **Vanity Cat** at the top of the screen.
+- **Behavior**:
+    - Pauses game physics.
+    - Hides all game pieces.
+    - Displays a dark overlay.
+- **UI Elements**:
+    - **Resume Button**: Returns to the game. Styled with rounded corners, orange background, and shadow (matching "Try Again" button).
+    - **Restart Button**: Resets the game. Styled similarly to Resume.
+    - **Helper Infographic**: A visual row at the bottom showing the progression of pieces (Level 1 -> Level 11).
 
 ## 5. Technical Requirements
 - **Responsive Design**: Must work seamlessly on both desktop browsers and mobile devices (phones/tablets).
@@ -59,3 +61,4 @@ Accessible via `ESC` key or UI Button.
 
 ### 6.1 Tangram Rules
 - **Connectivity**: Any object represented as a Tangram (e.g., Fish, Cat) must have all its individual geometric pieces touching each other. There should be no floating or disconnected parts.
+- **Minimalism**: Tangram objects should **not** have eyes, faces, or shine effects. They should rely solely on the geometric shapes and gradients for their visual identity.
