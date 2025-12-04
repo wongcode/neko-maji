@@ -218,7 +218,7 @@ export const TOYS: ToyConfig[] = [
     // }, // 10
 ];
 
-export const BOARD_WIDTH = 450;
+export const BOARD_WIDTH = 500;
 export const BOARD_HEIGHT = 700;
 export const DANGER_LINE_Y = 150;
 export const SPAWN_Y = 110;

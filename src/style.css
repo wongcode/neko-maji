@@ -210,3 +210,30 @@ canvas {
     opacity: 1;
   }
 }
+
+@media (max-width: 600px) {
+  .score-box {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 20px;
+  }
+
+  .score-label {
+    font-size: 8px;
+  }
+
+  .next-box {
+    padding: 4px 8px;
+    border-radius: 12px;
+  }
+
+  .next-label {
+    font-size: 8px;
+  }
+
+  #next-item-display {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+}

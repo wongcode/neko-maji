@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GameConfig } from '../Game';
 import { ToyRenderer } from '../objects/ToyRenderer';
 import { MoodMeter } from '../objects/MoodMeter';
+import { LaserManager } from '../objects/LaserManager';
 
 import { TOYS, BOARD_WIDTH, BOARD_HEIGHT, DANGER_LINE_Y, SPAWN_Y } from '../constants';
 
@@ -34,6 +35,11 @@ export class MainScene extends Phaser.Scene {
     private toysGroup!: Phaser.GameObjects.Group;
     private pauseMenuContainer?: Phaser.GameObjects.Container;
     private isPaused: boolean = false;
+
+    // Laser Power
+    private laserManager!: LaserManager;
+    private isLaserMode: boolean = false;
+    private laserButton!: Phaser.GameObjects.Container;
 
     constructor(config: GameConfig) {
         super('MainScene');
@@ -75,10 +81,15 @@ export class MainScene extends Phaser.Scene {
         this.setNextToy();
 
         // Initialize mouseX to center of board (will be updated by layout)
-        this.mouseX = this.scale.width / 2;
+        // Initialize mouseX to center of board
+        this.mouseX = this.boardX + BOARD_WIDTH / 2;
 
         // Graphics
         this.createVisuals();
+
+        // Laser Manager
+        this.laserManager = new LaserManager(this);
+        this.createLaserButton();
 
         // Vanity Animation: Dozing Cat
         this.anims.create({
@@ -139,8 +150,12 @@ export class MainScene extends Phaser.Scene {
 
         // Inputs
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            this.mouseX = pointer.x;
-            this.updateGhost();
+            if (this.isLaserMode) {
+                this.fireLaser(pointer);
+            } else {
+                this.mouseX = pointer.x;
+                this.updateGhost();
+            }
         });
 
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -149,7 +164,7 @@ export class MainScene extends Phaser.Scene {
 
         this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
             this.mouseX = pointer.x;
-            if (!this.gameOver && !this.blockNextDrop) {
+            if (!this.gameOver && !this.blockNextDrop && !this.isLaserMode) {
                 this.dropToy();
             }
             this.blockNextDrop = false; // Reset flag
@@ -180,7 +195,7 @@ export class MainScene extends Phaser.Scene {
 
             // Space to Drop
             this.input.keyboard.on('keydown-SPACE', () => {
-                if (!this.gameOver && !this.isPaused && !this.blockNextDrop) {
+                if (!this.gameOver && !this.isPaused && !this.blockNextDrop && !this.isLaserMode) {
                     this.dropToy();
                 }
             });
@@ -208,6 +223,7 @@ export class MainScene extends Phaser.Scene {
 
     private updateLayout() {
         const { width, height } = this.scale;
+        let catBottomY: number | undefined;
 
         // Store old position to calculate delta
         const oldBoardX = this.boardX;
@@ -225,12 +241,12 @@ export class MainScene extends Phaser.Scene {
         // Let's hardcode dimensions here or create it earlier?
         // Or just use the constants from MoodMeter class if they were static.
         // They are instance readonly.
-        const METER_WIDTH = 16;
-        const METER_HEIGHT = 400;
+        const METER_WIDTH = 300;
+        const METER_HEIGHT = 8;
 
-        const totalContentWidth = METER_WIDTH + gap + BOARD_WIDTH;
+        // Standard centering logic
+        const targetWidth = BOARD_WIDTH + padding * 2;
 
-        const targetWidth = totalContentWidth + padding * 2;
         let zoom = 1;
 
         if (width < targetWidth) {
@@ -242,20 +258,14 @@ export class MainScene extends Phaser.Scene {
         this.cameras.main.centerOn(width / 2, height / 2);
 
         // Recalculate positions
-        // We want to center the GROUP (Meter + Gap + Board)
-        const startX = (width - totalContentWidth) / 2;
-
-        // Meter Position
-        // const meterX = startX + this.METER_WIDTH / 2; 
-        // We position the container at top-left of its area
-
-        // Board Position
-        this.boardX = startX + METER_WIDTH + gap;
+        // Board is centered
+        this.boardX = (width - BOARD_WIDTH) / 2;
         this.boardY = (height - BOARD_HEIGHT) / 2;
 
-        // Update Meter Position
-        if (this.moodMeter) {
-            this.moodMeter.setPosition(startX, (height - METER_HEIGHT) / 2);
+
+
+        if (this.laserButton) {
+            this.laserButton.setPosition(this.boardX + BOARD_WIDTH / 2, height - 100);
         }
 
         // Calculate Delta
@@ -352,6 +362,18 @@ export class MainScene extends Phaser.Scene {
             console.log('Setting Cat Y to:', visibleTop + 10 + catHeight);
 
             cat.setPosition(width / 2, visibleTop + 10 + catHeight);
+            catBottomY = visibleTop + 10 + catHeight;
+        }
+
+        // Update Meter Position
+        if (this.moodMeter) {
+            const meterX = this.boardX + (BOARD_WIDTH - METER_WIDTH) / 2;
+            let meterY = this.boardY - METER_HEIGHT - 10;
+
+            if (catBottomY !== undefined) {
+                meterY = Math.min(catBottomY + 20, this.boardY - METER_HEIGHT - 10);
+            }
+            this.moodMeter.setPosition(meterX, meterY);
         }
     }
 
@@ -397,7 +419,11 @@ export class MainScene extends Phaser.Scene {
             }
         }
 
-        this.updateGhost();
+        if (this.isLaserMode) {
+            this.updateLaserAim();
+        } else {
+            this.updateGhost();
+        }
     }
 
     private createVisuals() {
@@ -704,7 +730,13 @@ export class MainScene extends Phaser.Scene {
                         // Points = TOYS[tier].score
                         this.mood += TOYS[tier].score;
                         if (this.mood > this.MAX_MOOD) this.mood = this.MAX_MOOD;
+                        this.mood += TOYS[tier].score;
+                        if (this.mood > this.MAX_MOOD) this.mood = this.MAX_MOOD;
                         this.updateMoodMeter();
+
+                        if (this.mood >= this.MAX_MOOD) {
+                            this.laserButton.setVisible(true);
+                        }
 
                         // Remove bodies and their game objects
                         // In Phaser Matter, removing the GameObject usually removes the body too if linked
@@ -797,6 +829,7 @@ export class MainScene extends Phaser.Scene {
 
         // 3. Infographic
         // Display toys in a row/grid at the bottom
+
 
         // Responsive Layout
         const isSmallScreen = width < 600;
@@ -993,7 +1026,7 @@ export class MainScene extends Phaser.Scene {
         }
     }
 
-    private playSound(type: 'drop' | 'merge') {
+    private playSound(type: 'drop' | 'merge' | 'pop') {
         // Use Phaser's shared AudioContext to avoid hitting browser limits
         if (this.sound instanceof Phaser.Sound.WebAudioSoundManager) {
             const audioCtx = this.sound.context;
@@ -1025,7 +1058,99 @@ export class MainScene extends Phaser.Scene {
                 gain.gain.linearRampToValueAtTime(0, now + 0.2);
                 osc.start(now);
                 osc.stop(now + 0.2);
+            } else if (type === 'pop') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
             }
         }
+    }
+    private createLaserButton() {
+        const { width, height } = this.scale;
+        this.laserButton = this.add.container(this.boardX + BOARD_WIDTH / 2, height - 100);
+        this.laserButton.setVisible(false);
+        this.laserButton.setDepth(150); // Above most things
+
+        const bg = this.add.circle(0, 0, 40, 0xff0000);
+        bg.setInteractive({ useHandCursor: true });
+        bg.on('pointerdown', (pointer: Phaser.Input.Pointer, localX: number, localY: number, event: Phaser.Types.Input.EventData) => {
+            event.stopPropagation();
+            this.activateLaserMode();
+        });
+
+        const text = this.add.text(0, 0, 'LASER', {
+            fontSize: '16px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Pulse animation
+        this.tweens.add({
+            targets: bg,
+            scale: 1.1,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
+        });
+
+        this.laserButton.add([bg, text]);
+    }
+
+    private activateLaserMode() {
+        this.isLaserMode = true;
+        this.laserButton.setVisible(false);
+        this.blockNextDrop = true; // Prevent accidental drop when clicking button
+
+        // Hide ghost toy
+        if (this.ghostToy) this.ghostToy.setVisible(false);
+        if (this.aimLine) this.aimLine.clear();
+
+        // Change cursor?
+        this.input.setDefaultCursor('crosshair');
+    }
+
+    private updateLaserAim() {
+        const pointer = this.input.activePointer;
+        const start = new Phaser.Math.Vector2(this.boardX + BOARD_WIDTH / 2, 0);
+        const end = new Phaser.Math.Vector2(pointer.x, pointer.y);
+
+        // Just draw a preview line
+        // We can use the laser manager to draw a "preview" (maybe thinner or different color)
+        // For now, let's just use the aimLine graphics
+        this.aimLine.clear();
+        this.aimLine.lineStyle(2, 0xff0000, 0.5);
+        this.aimLine.lineBetween(start.x, start.y, end.x, end.y);
+    }
+
+    private fireLaser(pointer: Phaser.Input.Pointer) {
+        if (!this.isLaserMode) return;
+
+        const start = new Phaser.Math.Vector2(this.boardX + BOARD_WIDTH / 2, 0);
+        const end = new Phaser.Math.Vector2(pointer.x, pointer.y);
+
+        this.laserManager.fire(start, end, (hitBody) => {
+            // Destroy the object
+            // Check if it's a toy part
+            const parent = hitBody.parent as any;
+            if (parent.gameObject) {
+                parent.gameObject.destroy();
+            }
+            this.matter.world.remove(parent);
+            this.playSound('pop'); // Reuse drop sound or add pop
+        });
+
+        // Reset State
+        this.isLaserMode = false;
+        this.mood = 0;
+        this.updateMoodMeter();
+        this.input.setDefaultCursor('default');
+        this.aimLine.clear();
+
+        // Prevent drop immediately after
+        this.blockNextDrop = true;
     }
 }

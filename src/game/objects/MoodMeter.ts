@@ -2,14 +2,14 @@ import Phaser from 'phaser';
 
 export class MoodMeter extends Phaser.GameObjects.Container {
     private moodFill: Phaser.GameObjects.Graphics;
-    public readonly METER_WIDTH = 16;
-    public readonly METER_HEIGHT = 400;
+    public readonly METER_WIDTH = 300;
+    public readonly METER_HEIGHT = 8;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y);
         scene.add.existing(this);
 
-        const radius = this.METER_WIDTH / 2;
+        const radius = this.METER_HEIGHT / 2;
 
         // Background
         const bg = scene.add.graphics();
@@ -33,20 +33,34 @@ export class MoodMeter extends Phaser.GameObjects.Container {
     public updateMood(currentMood: number, maxMood: number) {
         this.moodFill.clear();
 
-        // Calculate height based on mood %
+        // Calculate width based on mood %
         const percent = Phaser.Math.Clamp(currentMood / maxMood, 0, 1);
-        const fillHeight = this.METER_HEIGHT * percent;
+        const fillWidth = this.METER_WIDTH * percent;
 
         // Color gradient? Or just solid pink/orange
         const color = 0xff7043; // Orange
 
         this.moodFill.fillStyle(color, 1);
 
-        // Fill from bottom
-        const y = this.METER_HEIGHT - fillHeight;
-        const radius = this.METER_WIDTH / 2;
+        const radius = this.METER_HEIGHT / 2;
 
-        // Fix clipping: Round bottom corners
-        this.moodFill.fillRoundedRect(0, y, this.METER_WIDTH, fillHeight, { tl: 0, tr: 0, bl: radius, br: radius });
+        // Fill from left
+        // Fix clipping: Round left corners always, right corners if full?
+        // Actually fillRoundedRect handles radius well if width is small?
+        // If width < radius * 2, it might look weird.
+
+        // Let's just use fillRoundedRect with variable width.
+        // If we want it to look like a bar filling up, we should probably mask it or just draw rect.
+        // But rounded rect is nicer.
+
+        if (fillWidth > 0) {
+            this.moodFill.fillRoundedRect(0, 0, fillWidth, this.METER_HEIGHT, { tl: radius, tr: 0, bl: radius, br: 0 });
+            // If nearly full, round right side too?
+            if (percent > 0.95) {
+                this.moodFill.clear();
+                this.moodFill.fillStyle(color, 1);
+                this.moodFill.fillRoundedRect(0, 0, fillWidth, this.METER_HEIGHT, radius);
+            }
+        }
     }
 }
